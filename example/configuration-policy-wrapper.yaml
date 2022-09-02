@@ -1,0 +1,25 @@
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: ConfigurationPolicyWrapper
+metadata:
+  name: jkulikau
+  annotations:
+    config.kubernetes.io/function: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+spec:
+  configurationPolicyAnnotations:
+    policy.open-cluster-management.io/disable-templates: "true"
+  complianceType: "mustnothave"
+  # consolidateManifests: false
+  evaluationInterval:
+    compliant: 30m
+    noncompliant: 45s
+  metadataComplianceType: ""
+  namespaceSelector:
+    include: ["default"]
+    exclude: ["openshift-*"]
+    matchLabels: {}
+    matchExpressions: []
+  pruneObjectBehavior: "DeleteAll"
+  remediationAction: "enforce"
+  severity: "low"

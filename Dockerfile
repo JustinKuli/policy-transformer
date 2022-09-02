@@ -10,10 +10,10 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
+COPY *.go ./
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o transformer main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o transformer .
 
 # Use distroless as minimal base image to package the transformer binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
