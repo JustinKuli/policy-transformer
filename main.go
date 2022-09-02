@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 
 	"sigs.k8s.io/kustomize/kyaml/fn/framework"
@@ -12,128 +14,86 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-var baseConfigMap = []byte(`
-apiVersion: v1
-kind: ConfigMap
+const fakeNode = `
+apiVersion: fake/v1
+kind: FakeNode
 metadata:
-  name: game-config-aliens
-  namespace: default
-data: {}
-`)
+  name: foo
+`
 
-// func main() {
-// 	cfg := make(map[string]interface{})
-// 	cfg["my-default"] = "hello world"
+type PolicyTransformer struct {
+	Config *TransfomerConfig
+}
 
-// 	f := kio.FilterFunc(func(operand []*yaml.RNode) ([]*yaml.RNode, error) {
-// 		out := make([]*yaml.RNode, len(operand))
+type TransfomerConfig struct {
+	// ResourceMeta has APIVersion, Kind, and a subset of the k8s metadata fields
+	yaml.ResourceMeta `json:",inline" yaml:",inline"`
 
-// 		cfgRN, err := yaml.FromMap(cfg)
-// 		if err != nil {
-// 			return nil, err
-// 		}
+	InputResourceList []byte
+	CommandArgs       []string
+	LsOut             []byte
+}
 
-// 		for i, inp := range operand {
-// 			newnodes, err := kio.FromBytes(baseConfigMap)
-// 			if err != nil {
-// 				return nil, err
-// 			}
+func (t PolicyTransformer) Filter(operand []*yaml.RNode) ([]*yaml.RNode, error) {
+	out := make([]*yaml.RNode, len(operand))
 
-// 			data := make(map[string]string)
-// 			data["contents"] = inp.MustString()
-// 			data["config"] = cfgRN.MustString()
-// 			// data["args"] = strings.Join(os.Args, "::")
+	for i, inp := range operand {
+		err := inp.SetAnnotations(map[string]string{
+			"jkulikau.io/kind": fmt.Sprint(t.Config.Kind),
+		})
+		if err != nil {
+			return out, err
+		}
 
-// 			node := newnodes[0]
-// 			node.SetName(fmt.Sprintf("input-%v", i))
-// 			node.LoadMapIntoConfigMapData(data)
+		out[i] = inp
+	}
 
-// 			out[i] = node
-// 		}
+	rsrc, err := yaml.Parse(fakeNode)
+	if err != nil {
+		return out, err
+	}
 
-// 		return out, nil
-// 	})
+	err = rsrc.SetAnnotations(map[string]string{
+		"jkulikau.io/function-config-annotation": t.Config.Annotations["config.kubernetes.io/function"],
+		"jkulikau.io/input-debug":                string(t.Config.InputResourceList),
+		"jkulikau.io/args":                       strings.Join(t.Config.CommandArgs, "::"),
+		"jkulikau.io/config-cat":                 string(t.Config.LsOut),
+	})
+	if err != nil {
+		return out, err
+	}
 
-// 	proc := framework.SimpleProcessor{Filter: f, Config: &cfg}
+	out = append(out, rsrc)
 
-// 	err := framework.Execute(proc, nil)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// }
+	return out, nil
+}
 
 func main() {
-	inp, err := io.ReadAll(os.Stdin)
+	stdin, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	inpReader := bytes.NewReader(inp)
+	var lsOut []byte
 
-	cfg := make(map[string]interface{})
-	cfg["my-default"] = "hello world"
+	if len(os.Args) > 1 {
+		lsOut, err = exec.Command("cat", os.Args[1]).CombinedOutput()
+	}
 
-	f := kio.FilterFunc(func(operand []*yaml.RNode) ([]*yaml.RNode, error) {
-		cfgNode, err := kio.FromBytes(baseConfigMap)
-		if err != nil {
-			log.Fatal(err)
-		}
+	cfg := TransfomerConfig{
+		// Set defaults here?
+		InputResourceList: stdin,
+		CommandArgs:       os.Args,
+		LsOut:             lsOut,
+	}
 
-		cfgRN, err := yaml.FromMap(cfg)
-		if err != nil {
-			log.Fatal(err)
-		}
+	proc := framework.SimpleProcessor{Filter: PolicyTransformer{Config: &cfg}, Config: &cfg}
 
-		cfgString := cfgRN.MustString()
-
-		data := make(map[string]string)
-		data["input"] = string(inp)
-		data["config"] = cfgString
-		data["args"] = strings.Join(os.Args, "::")
-
-		cfgNode[0].LoadMapIntoConfigMapData(data)
-
-		operand = append(operand, cfgNode[0])
-
-		return operand, nil
-		// out := make([]*yaml.RNode, len(operand))
-
-		// cfgRN, err := yaml.FromMap(cfg)
-		// if err != nil {
-		// 	return nil, err
-		// }
-
-		// cfgString := cfgRN.MustString()
-
-		// for i, inp := range operand {
-		// 	newnodes, err := kio.FromBytes(baseConfigMap)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-
-		// 	data := make(map[string]string)
-		// 	data["contents"] = inp.MustString()
-		// 	data["config"] = cfgString
-		// 	data["args"] = strings.Join(os.Args, "::")
-
-		// 	node := newnodes[0]
-		// 	node.SetName(fmt.Sprintf("input-%v", i))
-		// 	node.LoadMapIntoConfigMapData(data)
-
-		// 	out[i] = node
-		// }
-
-		// return out, nil
-	})
-
-	proc := framework.SimpleProcessor{Filter: f, Config: &cfg}
-
-	rlSrc := &kio.ByteReadWriter{
-		Reader:                inpReader,
+	err = framework.Execute(proc, &kio.ByteReadWriter{
+		Reader:                bytes.NewReader(stdin),
 		Writer:                os.Stdout,
 		KeepReaderAnnotations: true,
-	}
-	err = framework.Execute(proc, rlSrc)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}

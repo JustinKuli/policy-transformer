@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
 - github.com/redhat-cop/gitops-catalog/advanced-cluster-management/operator/overlays/release-2.5?ref=main
 transformers:
+# generators:
 - policy-transformer.yaml

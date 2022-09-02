@@ -5,58 +5,47 @@ metadata:
     openshift.io/cluster-monitoring: "true"
   name: open-cluster-management
 ---
-apiVersion: v1
-data:
-  args: /transformer
-  config: |
-    apiVersion: someteam.example.com/v1
-    kind: PolicyTransformer
-    metadata:
-      annotations:
-        config.kubernetes.io/function: |
-          container:
-            image: quay.io/justinkuli/scratchpad:policy-transformer
-        config.kubernetes.io/local-config: "true"
-      name: jkulikau
-    my-default: hello world
-    spec:
-      chartName: minecraft
-  input: |
-    apiVersion: config.kubernetes.io/v1
-    kind: ResourceList
-    items:
-    - apiVersion: someteam.example.com/v1
-      kind: PolicyTransformer
-      metadata:
-        annotations:
-          config.kubernetes.io/function: |
-            container:
-              image: quay.io/justinkuli/scratchpad:policy-transformer
-          config.kubernetes.io/local-config: 'true'
-          config.kubernetes.io/index: '0'
-          internal.config.kubernetes.io/index: '0'
-          internal.config.kubernetes.io/annotations-migration-resource-id: '0'
-          internal.config.kubernetes.io/id: '1'
-          config.k8s.io/id: '1'
-        name: jkulikau
-      spec:
-        chartName: minecraft
-    functionConfig:
-      apiVersion: someteam.example.com/v1
-      kind: PolicyTransformer
-      metadata:
-        annotations:
-          config.kubernetes.io/function: |
-            container:
-              image: quay.io/justinkuli/scratchpad:policy-transformer
-          config.kubernetes.io/local-config: 'true'
-        name: jkulikau
-      spec:
-        chartName: minecraft
-kind: ConfigMap
+apiVersion: fake/v1
+kind: FakeNode
 metadata:
-  name: game-config-aliens
-  namespace: default
+  annotations:
+    jkulikau.io/args: /transformer
+    jkulikau.io/function-config-annotation: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+    jkulikau.io/input-debug: |
+      apiVersion: config.kubernetes.io/v1
+      kind: ResourceList
+      items:
+      - apiVersion: policy.open-cluster-management.io/v1alpha1
+        kind: FakeContainerPolicyTransformer
+        metadata:
+          annotations:
+            config.kubernetes.io/function: |
+              container:
+                image: quay.io/justinkuli/scratchpad:policy-transformer
+            config.kubernetes.io/local-config: 'true'
+            config.kubernetes.io/index: '0'
+            internal.config.kubernetes.io/index: '0'
+            internal.config.kubernetes.io/annotations-migration-resource-id: '0'
+            internal.config.kubernetes.io/id: '1'
+            config.k8s.io/id: '1'
+          name: jkulikau
+        spec:
+          foo: bar
+      functionConfig:
+        apiVersion: policy.open-cluster-management.io/v1alpha1
+        kind: FakeContainerPolicyTransformer
+        metadata:
+          annotations:
+            config.kubernetes.io/function: |
+              container:
+                image: quay.io/justinkuli/scratchpad:policy-transformer
+            config.kubernetes.io/local-config: 'true'
+          name: jkulikau
+        spec:
+          foo: bar
+  name: foo
 ---
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -78,3 +67,12 @@ spec:
   name: advanced-cluster-management
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+---
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: FakeContainerPolicyTransformer
+metadata:
+  annotations:
+    jkulikau.io/kind: FakeContainerPolicyTransformer
+  name: jkulikau
+spec:
+  foo: bar
