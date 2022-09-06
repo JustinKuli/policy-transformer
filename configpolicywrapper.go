@@ -100,7 +100,7 @@ func (c ConfigurationPolicyWrapper) Filter(operand []*yaml.RNode) ([]*yaml.RNode
 }
 
 func (c ConfigurationPolicyWrapper) WrapResource(res *yaml.RNode) (*yaml.RNode, error) {
-	wrapped := yaml.MustParse(`{}`)
+	wrapped := yaml.NewMapRNode(nil)
 
 	err := wrapped.PipeE(
 		yaml.SetField("objectDefinition", res),
@@ -111,7 +111,7 @@ func (c ConfigurationPolicyWrapper) WrapResource(res *yaml.RNode) (*yaml.RNode, 
 
 	if c.ComplianceType != "" {
 		err := wrapped.PipeE(
-			yaml.SetField("complianceType", yaml.MustParse(c.ComplianceType)),
+			yaml.SetField("complianceType", yaml.NewScalarRNode(c.ComplianceType)),
 		)
 		if err != nil {
 			return wrapped, err
@@ -120,7 +120,7 @@ func (c ConfigurationPolicyWrapper) WrapResource(res *yaml.RNode) (*yaml.RNode, 
 
 	if c.MetadataComplianceType != "" {
 		err := wrapped.PipeE(
-			yaml.SetField("metadataComplianceType", yaml.MustParse(c.MetadataComplianceType)),
+			yaml.SetField("metadataComplianceType", yaml.NewScalarRNode(c.MetadataComplianceType)),
 		)
 		if err != nil {
 			return wrapped, err
@@ -153,7 +153,7 @@ func (c ConfigurationPolicyWrapper) NewPolicy() (*yaml.RNode, error) {
 	if c.EvaluationInterval.Compliant != "" {
 		err := policy.PipeE(
 			yaml.LookupCreate(yaml.MappingNode, "spec", "evaluationInterval"),
-			yaml.SetField("compliant", yaml.MustParse(c.EvaluationInterval.Compliant)),
+			yaml.SetField("compliant", yaml.NewScalarRNode(c.EvaluationInterval.Compliant)),
 		)
 		if err != nil {
 			return policy, err
@@ -163,7 +163,7 @@ func (c ConfigurationPolicyWrapper) NewPolicy() (*yaml.RNode, error) {
 	if c.EvaluationInterval.NonCompliant != "" {
 		err := policy.PipeE(
 			yaml.LookupCreate(yaml.MappingNode, "spec", "evaluationInterval"),
-			yaml.SetField("noncompliant", yaml.MustParse(c.EvaluationInterval.NonCompliant)),
+			yaml.SetField("noncompliant", yaml.NewScalarRNode(c.EvaluationInterval.NonCompliant)),
 		)
 		if err != nil {
 			return policy, err
@@ -218,7 +218,7 @@ func (c ConfigurationPolicyWrapper) NewPolicy() (*yaml.RNode, error) {
 	if c.PruneObjectBehavior != "" {
 		err := policy.PipeE(
 			yaml.LookupCreate(yaml.MappingNode, "spec"),
-			yaml.SetField("pruneObjectBehavior", yaml.MustParse(c.PruneObjectBehavior)),
+			yaml.SetField("pruneObjectBehavior", yaml.NewScalarRNode(c.PruneObjectBehavior)),
 		)
 		if err != nil {
 			return policy, err
@@ -228,7 +228,7 @@ func (c ConfigurationPolicyWrapper) NewPolicy() (*yaml.RNode, error) {
 	if c.RemediationAction != "" {
 		err := policy.PipeE(
 			yaml.LookupCreate(yaml.MappingNode, "spec"),
-			yaml.SetField("remediationAction", yaml.MustParse(c.RemediationAction)),
+			yaml.SetField("remediationAction", yaml.NewScalarRNode(c.RemediationAction)),
 		)
 		if err != nil {
 			return policy, err
@@ -238,7 +238,7 @@ func (c ConfigurationPolicyWrapper) NewPolicy() (*yaml.RNode, error) {
 	if c.Severity != "" {
 		err := policy.PipeE(
 			yaml.LookupCreate(yaml.MappingNode, "spec"),
-			yaml.SetField("severity", yaml.MustParse(c.Severity)),
+			yaml.SetField("severity", yaml.NewScalarRNode(c.Severity)),
 		)
 		if err != nil {
 			return policy, err

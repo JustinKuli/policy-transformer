@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- https://github.com/redhat-cop/gitops-catalog/kyverno/overlays/sample-policies?ref=main
-# - github.com/redhat-cop/gitops-catalog/advanced-cluster-management/operator/overlays/release-2.5?ref=main
+- ./kyverno-remote
+- ./local
 transformers:
-- configuration-policy-wrapper.yaml
+- policy-wrapper.yaml

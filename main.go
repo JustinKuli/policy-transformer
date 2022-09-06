@@ -45,6 +45,17 @@ func (t PolicyTransformer) Filter(operand []*yaml.RNode) ([]*yaml.RNode, error) 
 		w.PolicyName = t.Config.Name
 
 		transformer = w
+	case "PolicyWrapper":
+		w := NewPolicyWrapper()
+
+		err = json.Unmarshal(configSpec, &w)
+		if err != nil {
+			return operand, err
+		}
+
+		w.PolicyName = t.Config.Name
+
+		transformer = w
 	default:
 		return operand, fmt.Errorf("unknown PolicyTransformer kind '%v'", t.Config.Kind)
 	}
