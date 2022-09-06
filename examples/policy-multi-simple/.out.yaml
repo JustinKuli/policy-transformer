@@ -1,45 +1,38 @@
-apiVersion: apps.open-cluster-management.io/v1
-kind: PlacementRule
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
 metadata:
-  name: placement-kitchen-sink
+  name: placement-policy-multi-simple
 spec:
-  clusterSelector:
-    matchExpressions:
-    - key: local-cluster
-      operator: In
-      values:
-      - mine
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+        - key: local-cluster
+          operator: In
+          values:
+          - true
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 metadata:
-  name: binding-kitchen-sink
+  name: binding-policy-multi-simple
 placementRef:
-  apiGroup: apps.open-cluster-management.io
-  kind: PlacementRule
-  name: placement-kitchen-sink
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+  name: placement-policy-multi-simple
 subjects:
 - apiGroup: policy.open-cluster-management.io
   kind: Policy
-  name: kitchen-sink-0
-- apiGroup: policy.open-cluster-management.io
-  kind: Policy
-  name: kitchen-sink-1
-- apiGroup: policy.open-cluster-management.io
-  kind: Policy
-  name: kitchen-sink-2
-- apiGroup: policy.open-cluster-management.io
-  kind: Policy
-  name: kitchen-sink-3
+  name: policy-multi-simple
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
   annotations:
-    policy.open-cluster-management.io/categories: CM Configuration Management
-    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
-    policy.open-cluster-management.io/standards: NIST SP 800-53
-  name: kitchen-sink-0
+    policy.open-cluster-management.io/categories: ""
+    policy.open-cluster-management.io/controls: ""
+    policy.open-cluster-management.io/standards: ""
+  name: policy-multi-simple
 spec:
   policy-templates:
   - objectDefinition:
@@ -47,26 +40,71 @@ spec:
       kind: ConfigurationPolicy
       metadata:
         annotations:
-          policy.open-cluster-management.io/disable-templates: "true"
-        name: kyverno-0
+          dir: policy-multi-simple
+        name: config-local-simple
       spec:
-        evaluationInterval:
-          compliant: 30m
-          noncompliant: 45s
         namespaceSelector:
           exclude:
           - openshift-*
           include:
           - default
-          matchExpressions:
-          - key: openshift-only
-            operator: NotIn
-            value:
-            - "true"
-          matchLabels:
-            kyverno: install-here
         object-templates:
-        - complianceType: mustnothave
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              annotations: {}
+              labels:
+                app: config-local-simple
+              name: local-one-nginx-deployment
+            spec:
+              replicas: 3
+              selector:
+                matchLabels:
+                  app: config-local-simple
+              template:
+                metadata:
+                  labels:
+                    app: config-local-simple
+                spec:
+                  containers:
+                  - image: nginx:1.14.2
+                    name: nginx
+                    ports:
+                    - containerPort: 80
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              annotations: {}
+              labels:
+                app: config-local-simple
+              name: local-one-my-service
+            spec:
+              ports:
+              - port: 80
+                protocol: TCP
+                targetPort: 9376
+              selector:
+                app: config-local-simple
+        remediationAction: inform
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations:
+          dir: policy-multi-simple
+        name: config-remote
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: mustonlyhave
           objectDefinition:
             apiVersion: kyverno.io/v1
             kind: ClusterPolicy
@@ -86,7 +124,9 @@ spec:
                 policies.kyverno.io/severity: medium
                 policies.kyverno.io/subject: Pod
                 policies.kyverno.io/title: Require Pod Probes
-              name: require-pod-probes
+              labels:
+                app: config-remote
+              name: kyverno-remote-require-pod-probes
             spec:
               background: true
               failurePolicy: Ignore
@@ -106,45 +146,7 @@ spec:
                         readinessProbe:
                           periodSeconds: '>0'
               validationFailureAction: audit
-        pruneObjectBehavior: DeleteAll
-        remediationAction: enforce
-        severity: low
----
-apiVersion: policy.open-cluster-management.io/v1
-kind: Policy
-metadata:
-  annotations:
-    policy.open-cluster-management.io/categories: CM Configuration Management
-    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
-    policy.open-cluster-management.io/standards: NIST SP 800-53
-  name: kitchen-sink-1
-spec:
-  policy-templates:
-  - objectDefinition:
-      apiVersion: policy.open-cluster-management.io/v1
-      kind: ConfigurationPolicy
-      metadata:
-        annotations:
-          policy.open-cluster-management.io/disable-templates: "true"
-        name: kyverno-1
-      spec:
-        evaluationInterval:
-          compliant: 30m
-          noncompliant: 45s
-        namespaceSelector:
-          exclude:
-          - openshift-*
-          include:
-          - default
-          matchExpressions:
-          - key: openshift-only
-            operator: NotIn
-            value:
-            - "true"
-          matchLabels:
-            kyverno: install-here
-        object-templates:
-        - complianceType: mustnothave
+        - complianceType: mustonlyhave
           objectDefinition:
             apiVersion: kyverno.io/v1
             kind: ClusterPolicy
@@ -162,7 +164,9 @@ spec:
                 policies.kyverno.io/severity: medium
                 policies.kyverno.io/subject: Pod
                 policies.kyverno.io/title: Require Limits and Requests
-              name: require-requests-limits
+              labels:
+                app: config-remote
+              name: kyverno-remote-require-requests-limits
             spec:
               background: true
               failurePolicy: Ignore
@@ -184,45 +188,7 @@ spec:
                             cpu: ?*
                             memory: ?*
               validationFailureAction: audit
-        pruneObjectBehavior: DeleteAll
-        remediationAction: enforce
-        severity: low
----
-apiVersion: policy.open-cluster-management.io/v1
-kind: Policy
-metadata:
-  annotations:
-    policy.open-cluster-management.io/categories: CM Configuration Management
-    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
-    policy.open-cluster-management.io/standards: NIST SP 800-53
-  name: kitchen-sink-2
-spec:
-  policy-templates:
-  - objectDefinition:
-      apiVersion: policy.open-cluster-management.io/v1
-      kind: ConfigurationPolicy
-      metadata:
-        annotations:
-          policy.open-cluster-management.io/disable-templates: "true"
-        name: kyverno-2
-      spec:
-        evaluationInterval:
-          compliant: 30m
-          noncompliant: 45s
-        namespaceSelector:
-          exclude:
-          - openshift-*
-          include:
-          - default
-          matchExpressions:
-          - key: openshift-only
-            operator: NotIn
-            value:
-            - "true"
-          matchLabels:
-            kyverno: install-here
-        object-templates:
-        - complianceType: mustnothave
+        - complianceType: mustonlyhave
           objectDefinition:
             apiVersion: kyverno.io/v1
             kind: ClusterPolicy
@@ -239,7 +205,9 @@ spec:
                 policies.kyverno.io/subject: Role,ClusterRole
                 policies.kyverno.io/title: Disallow use of the SecurityContextConstraint
                   (SCC) anyuid
-              name: disallow-security-context-constraint-anyuid
+              labels:
+                app: config-remote
+              name: kyverno-remote-disallow-security-context-constraint-anyuid
             spec:
               background: true
               failurePolicy: Ignore
@@ -283,73 +251,4 @@ spec:
                   message: Use of the SecurityContextConstraint (SCC) anyuid is not
                     allowed
               validationFailureAction: audit
-        pruneObjectBehavior: DeleteAll
         remediationAction: enforce
-        severity: low
----
-apiVersion: policy.open-cluster-management.io/v1
-kind: Policy
-metadata:
-  annotations:
-    policy.open-cluster-management.io/categories: CM Configuration Management
-    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
-    policy.open-cluster-management.io/standards: NIST SP 800-53
-  name: kitchen-sink-3
-spec:
-  policy-templates:
-  - objectDefinition:
-      apiVersion: policy.open-cluster-management.io/v1
-      kind: ConfigurationPolicy
-      metadata:
-        annotations: {}
-        name: local-app
-      spec:
-        evaluationInterval:
-          compliant: 1h
-        namespaceSelector:
-          exclude:
-          - openshift-*
-          include:
-          - default
-        object-templates:
-        - complianceType: musthave
-          objectDefinition:
-            apiVersion: apps/v1
-            kind: Deployment
-            metadata:
-              annotations: {}
-              labels:
-                app: my-local-app
-              name: nginx-deployment
-            spec:
-              replicas: 3
-              selector:
-                matchLabels:
-                  app: my-local-app
-              template:
-                metadata:
-                  labels:
-                    app: my-local-app
-                spec:
-                  containers:
-                  - image: nginx:1.14.2
-                    name: nginx
-                    ports:
-                    - containerPort: 80
-        - complianceType: musthave
-          objectDefinition:
-            apiVersion: v1
-            kind: Service
-            metadata:
-              annotations: {}
-              labels:
-                app: my-local-app
-              name: my-service
-            spec:
-              ports:
-              - port: 80
-                protocol: TCP
-                targetPort: 9376
-              selector:
-                app: my-local-app
-        remediationAction: inform

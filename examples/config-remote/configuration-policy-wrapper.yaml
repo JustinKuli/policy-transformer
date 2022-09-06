@@ -1,0 +1,14 @@
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: ConfigurationPolicyWrapper
+metadata:
+  name: config-remote
+  annotations:
+    config.kubernetes.io/function: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+spec:
+  complianceType: "mustonlyhave"
+  namespaceSelector:
+    include: ["default"]
+    exclude: ["openshift-*"]
+  remediationAction: "enforce"

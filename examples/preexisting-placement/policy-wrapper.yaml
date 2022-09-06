@@ -1,0 +1,14 @@
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: PolicyWrapper
+metadata:
+  name: preexisting-placement
+  annotations:
+    config.kubernetes.io/function: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+spec:
+  consolidateManifests: false # make a separate Policy for each input
+  consolidatePlacements: true # use one Placement for all Policies
+  categories: ["CM Configuration Management"]
+  controls: ["CM-2 Baseline Configuration"]
+  standards: ["NIST SP 800-53"]

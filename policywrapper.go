@@ -13,7 +13,8 @@ type PolicyWrapper struct {
 	ConsolidateManifests  bool     `json:"consolidateManifests,omitempty"`
 	ConsolidatePlacements bool     `json:"consolidatePlacements,omitempty"`
 	Disabled              bool     `json:"disabled,omitempty"`
-	IgnoreNonPolicies     bool     `json:"ignoreNonPolicies,omitempty"`
+	WrapNonPolicies       bool     `json:"wrapNonPolicies,omitempty"`
+	DropNonPolicies       bool     `json:"dropNonPolicies,omitempty"`
 	PlacementSpec         struct {
 		IgnoreExisting   bool              `json:"ignoreExisting,omitempty"`
 		ClusterSelectors map[string]string `json:"clusterSelectors,omitempty"` // These (unnecessarily?) limit what can
@@ -24,6 +25,7 @@ type PolicyWrapper struct {
 	Standards         []string `json:"standards,omitempty"`
 }
 
+// NewPolicyWrapper returns a new PolicyWrapper with some defaults set.
 func NewPolicyWrapper() PolicyWrapper {
 	// Note: leaving things unset in the config will not overwrite these defaults
 	// with the "empty" golang values (eg not setting ConsolidateManifests will
@@ -32,17 +34,20 @@ func NewPolicyWrapper() PolicyWrapper {
 		ConsolidateManifests:  true,
 		ConsolidatePlacements: false,
 		Disabled:              false,
-		IgnoreNonPolicies:     true,
+		WrapNonPolicies:       false,
+		DropNonPolicies:       false,
 	}
-	w.PlacementSpec.IgnoreExisting = true
+	w.PlacementSpec.IgnoreExisting = false
 
 	return w
 }
 
+// Filter wraps the given inputs into one or more policies, based on the
+// configuration.
 func (c PolicyWrapper) Filter(operand []*yaml.RNode) ([]*yaml.RNode, error) {
 	policies, other, inputPlacement := Split(operand)
 
-	if c.IgnoreNonPolicies { // only wrap policies, leave others unchanged
+	if !c.WrapNonPolicies { // only wrap policies, leave others unchanged
 		operand = policies
 	}
 
@@ -114,8 +119,6 @@ func (c PolicyWrapper) Filter(operand []*yaml.RNode) ([]*yaml.RNode, error) {
 
 			out = append(out, policy)
 
-			// TODO: need to think about interactions with input Placement and placement.ignoreExisting
-			// For now, do something easier
 			if !c.ConsolidatePlacements {
 				placement, err := c.NewPlacement(baseName)
 				if err != nil {
@@ -154,13 +157,19 @@ func (c PolicyWrapper) Filter(operand []*yaml.RNode) ([]*yaml.RNode, error) {
 		}
 	}
 
-	if c.IgnoreNonPolicies { // emit non-policies unchanged
+	if !c.DropNonPolicies { // emit non-policies unchanged
 		out = append(out, other...)
+	} else if !c.PlacementSpec.IgnoreExisting && inputPlacement != nil {
+		// Special case where the input placement is being used,
+		// but all other non-policies should be dropped.
+		out = append(out, inputPlacement)
 	}
 
 	return out, nil
 }
 
+// WrapResource returns a yaml map with one field: `objectDefinition`, which
+// contains the input yaml node.
 func (c PolicyWrapper) WrapResource(res *yaml.RNode) (*yaml.RNode, error) {
 	wrapped := yaml.NewMapRNode(nil)
 
@@ -176,6 +185,8 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 `
 
+// NewPolicy returns a Policy based on the configuration, ready to have objects
+// inserted into `spec.policy-templates`.
 func (c PolicyWrapper) NewPolicy(name string) (*yaml.RNode, error) {
 	policy := yaml.MustParse(basePolicy)
 
@@ -234,7 +245,8 @@ spec:
     matchExpressions: []
 `
 
-func (c PolicyWrapper) NewPlacement(name string) (*yaml.RNode, error) {
+// NewPlacement returns a Placement or PlacementRule based on the configuration.
+func (c PolicyWrapper) NewPlacement(baseName string) (*yaml.RNode, error) {
 	var placement *yaml.RNode
 
 	if len(c.PlacementSpec.ClusterSelectors) != 0 {
@@ -284,7 +296,7 @@ func (c PolicyWrapper) NewPlacement(name string) (*yaml.RNode, error) {
 		}
 	}
 
-	placement.SetName("placement-" + name)
+	placement.SetName("placement-" + baseName)
 
 	return placement, nil
 }
@@ -294,7 +306,13 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 `
 
-func (c PolicyWrapper) NewPlacementBinding(name string, policies []string, placement *yaml.RNode) (*yaml.RNode, error) {
+// NewPlacementBinding returns a PlacementBinding connecting the given policies
+// to the given placement. If the input placement is nil, it will connect the
+// policies to the placement that would be created by NewPlacement with this
+// configuration.
+func (c PolicyWrapper) NewPlacementBinding(
+	baseName string, policies []string, placement *yaml.RNode,
+) (*yaml.RNode, error) {
 	binding := yaml.MustParse(basePlacementBinding)
 
 	var placementKind, placementGroup *yaml.RNode
@@ -314,7 +332,7 @@ func (c PolicyWrapper) NewPlacementBinding(name string, policies []string, place
 
 	err := binding.PipeE(
 		yaml.LookupCreate(yaml.MappingNode, "placementRef"),
-		yaml.Tee(yaml.SetField("name", yaml.NewScalarRNode("placement-"+name))),
+		yaml.Tee(yaml.SetField("name", yaml.NewScalarRNode("placement-"+baseName))),
 		yaml.Tee(yaml.SetField("kind", placementKind)),
 		yaml.Tee(yaml.SetField("apiGroup", placementGroup)),
 	)
@@ -343,10 +361,14 @@ func (c PolicyWrapper) NewPlacementBinding(name string, policies []string, place
 		}
 	}
 
-	binding.SetName("binding-" + name)
+	binding.SetName("binding-" + baseName)
 	return binding, nil
 }
 
+// BuildMatchExpressions returns a list of yaml map nodes, formatted to be used
+// as items in a `MatchExpressions` list. Note: due to implementation quirks,
+// the items in the list have to be individually unwrapped as YNodes in order to
+// be appended to an existing yaml object.
 func BuildMatchExpressions(sel map[string]string) ([]*yaml.RNode, error) {
 	list := make([]*yaml.RNode, 0)
 
@@ -379,6 +401,8 @@ func BuildMatchExpressions(sel map[string]string) ([]*yaml.RNode, error) {
 	return list, nil
 }
 
+// Split separates the inputs into policies, and non-policies. It also finds and
+// returns the first Placement or PlacementRule in the input, or nil.
 func Split(operand []*yaml.RNode) (policies, other []*yaml.RNode, placement *yaml.RNode) {
 	policies = make([]*yaml.RNode, 0)
 	other = make([]*yaml.RNode, 0)

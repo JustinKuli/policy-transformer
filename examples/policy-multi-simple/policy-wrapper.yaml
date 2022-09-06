@@ -1,0 +1,14 @@
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: PolicyWrapper
+metadata:
+  name: policy-multi-simple
+  annotations:
+    config.kubernetes.io/function: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+spec:
+  consolidateManifests: true # this is the default
+  consolidatePlacements: false # this is the default
+  placement:
+    labelSelector: # For a Placement
+      local-cluster: "true"

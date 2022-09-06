@@ -1,0 +1,95 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/disable-templates: "true"
+  name: config-local-complex-0
+spec:
+  evaluationInterval:
+    compliant: 30m
+    noncompliant: 45s
+  namespaceSelector:
+    exclude:
+    - openshift-*
+    include:
+    - default
+    matchExpressions:
+    - key: openshift-only
+      operator: NotIn
+      value:
+      - "true"
+    matchLabels:
+      foobar: baz
+  object-templates:
+  - complianceType: mustonlyhave
+    metadataComplianceType: musthave
+    objectDefinition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        annotations: {}
+        labels:
+          app: config-local-simple
+        name: local-one-nginx-deployment
+      spec:
+        replicas: 3
+        selector:
+          matchLabels:
+            app: config-local-simple
+        template:
+          metadata:
+            labels:
+              app: config-local-simple
+          spec:
+            containers:
+            - image: nginx:1.14.2
+              name: nginx
+              ports:
+              - containerPort: 80
+  pruneObjectBehavior: DeleteAll
+  remediationAction: enforce
+  severity: low
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/disable-templates: "true"
+  name: config-local-complex-1
+spec:
+  evaluationInterval:
+    compliant: 30m
+    noncompliant: 45s
+  namespaceSelector:
+    exclude:
+    - openshift-*
+    include:
+    - default
+    matchExpressions:
+    - key: openshift-only
+      operator: NotIn
+      value:
+      - "true"
+    matchLabels:
+      foobar: baz
+  object-templates:
+  - complianceType: mustonlyhave
+    metadataComplianceType: musthave
+    objectDefinition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        annotations: {}
+        labels:
+          app: config-local-simple
+        name: local-one-my-service
+      spec:
+        ports:
+        - port: 80
+          protocol: TCP
+          targetPort: 9376
+        selector:
+          app: config-local-simple
+  pruneObjectBehavior: DeleteAll
+  remediationAction: enforce
+  severity: low

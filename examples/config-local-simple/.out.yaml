@@ -1,0 +1,52 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: config-local-simple
+spec:
+  namespaceSelector:
+    exclude:
+    - openshift-*
+    include:
+    - default
+  object-templates:
+  - complianceType: musthave
+    objectDefinition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        annotations: {}
+        labels:
+          app: config-local-simple
+        name: local-one-nginx-deployment
+      spec:
+        replicas: 3
+        selector:
+          matchLabels:
+            app: config-local-simple
+        template:
+          metadata:
+            labels:
+              app: config-local-simple
+          spec:
+            containers:
+            - image: nginx:1.14.2
+              name: nginx
+              ports:
+              - containerPort: 80
+  - complianceType: musthave
+    objectDefinition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        annotations: {}
+        labels:
+          app: config-local-simple
+        name: local-one-my-service
+      spec:
+        ports:
+        - port: 80
+          protocol: TCP
+          targetPort: 9376
+        selector:
+          app: config-local-simple
+  remediationAction: inform

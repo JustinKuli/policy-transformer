@@ -1,0 +1,11 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: prebuiltplacement
+spec:
+  clusterSelector:
+    matchExpressions:
+    - key: foobar
+      operator: In
+      values:
+      - baz

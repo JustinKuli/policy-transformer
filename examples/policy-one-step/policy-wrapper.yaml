@@ -1,0 +1,14 @@
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: PolicyWrapper
+metadata:
+  name: one-step-pol
+  annotations:
+    config.kubernetes.io/function: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+spec:
+  consolidateManifests: false # make a separate Policy for each input
+  consolidatePlacements: true # make one Placement for all Policies
+  placement:
+    clusterSelectors: # For a PlacementRule
+      local-cluster: "true"

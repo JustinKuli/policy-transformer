@@ -89,9 +89,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cfg := TransfomerConfig{
-		// Set defaults here?
-	}
+	cfg := TransfomerConfig{}
 
 	proc := framework.SimpleProcessor{Filter: PolicyTransformer{Config: &cfg}, Config: &cfg}
 

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ./deployment.yaml
+- ./service.yaml
+transformers:
+- |-
+  apiVersion: policy.open-cluster-management.io/v1alpha1
+  kind: ConfigurationPolicyWrapper
+  metadata:
+    name: cfgwrap
+    annotations:
+      config.kubernetes.io/function: |
+        container:
+          image: quay.io/justinkuli/scratchpad:policy-transformer
+  spec:
+    consolidateManifests: false # Make a separate ConfigurationPolicy for each input
+    namespaceSelector:
+      include: ["default"]
+      exclude: ["openshift-*"]
+    remediationAction: "inform"
+- |-
+  apiVersion: policy.open-cluster-management.io/v1alpha1
+  kind: PolicyWrapper
+  metadata:
+    name: polwrap
+    annotations:
+      config.kubernetes.io/function: |
+        container:
+          image: quay.io/justinkuli/scratchpad:policy-transformer
+  spec: {} # no spec required!

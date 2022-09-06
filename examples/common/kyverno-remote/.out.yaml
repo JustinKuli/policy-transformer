@@ -1,0 +1,132 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  annotations:
+    kyverno.io/kubernetes-version: "1.20"
+    kyverno.io/kyverno-version: 1.6.0
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/description: Disallow the use of the SecurityContextConstraint
+      (SCC) anyuid which allows a pod to run with the UID as declared in the image
+      instead of a random UID
+    policies.kyverno.io/minversion: 1.6.0
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Role,ClusterRole
+    policies.kyverno.io/title: Disallow use of the SecurityContextConstraint (SCC)
+      anyuid
+  name: kyverno-remote-disallow-security-context-constraint-anyuid
+spec:
+  background: true
+  failurePolicy: Ignore
+  rules:
+  - match:
+      any:
+      - resources:
+          kinds:
+          - ClusterRole
+          - Role
+    name: check-security-context-constraint
+    validate:
+      foreach:
+      - deny:
+          conditions:
+            all:
+            - key: anyuid
+              operator: AnyIn
+              value: '{{element.resourceNames[]}}'
+            - key: '{{ element.verbs[]  | contains(@, ''use'') || contains(@, ''*'')
+                }}'
+              operator: Equals
+              value: true
+        list: request.object.rules[]
+      message: Use of the SecurityContextConstraint (SCC) anyuid is not allowed
+  - match:
+      any:
+      - resources:
+          kinds:
+          - ClusterRoleBinding
+          - RoleBinding
+    name: check-security-context-roleref
+    validate:
+      deny:
+        conditions:
+          all:
+          - key: system:openshift:scc:anyuid
+            operator: Equals
+            value: '{{request.object.roleRef.name}}'
+      message: Use of the SecurityContextConstraint (SCC) anyuid is not allowed
+  validationFailureAction: audit
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  annotations:
+    pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/description: Liveness and readiness probes need to be configured
+      to correctly manage a Pod's lifecycle during deployments, restarts, and upgrades.
+      For each Pod, a periodic `livenessProbe` is performed by the kubelet to determine
+      if the Pod's containers are running or need to be restarted. A `readinessProbe`
+      is used by Services and Deployments to determine if the Pod is ready to receive
+      network traffic. This policy validates that all containers have liveness and
+      readiness probes by ensuring the `periodSeconds` field is greater than zero.
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/title: Require Pod Probes
+  name: kyverno-remote-require-pod-probes
+spec:
+  background: true
+  failurePolicy: Ignore
+  rules:
+  - match:
+      resources:
+        kinds:
+        - Pod
+    name: validate-livenessProbe-readinessProbe
+    validate:
+      message: Liveness and readiness probes are required.
+      pattern:
+        spec:
+          containers:
+          - livenessProbe:
+              periodSeconds: '>0'
+            readinessProbe:
+              periodSeconds: '>0'
+  validationFailureAction: audit
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  annotations:
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/description: As application workloads share cluster resources,
+      it is important to limit resources requested and consumed by each Pod. It is
+      recommended to require resource requests and limits per Pod, especially for
+      memory and CPU. If a Namespace level request or limit is specified, defaults
+      will automatically be applied to each Pod based on the LimitRange configuration.
+      This policy validates that all containers have something specified for memory
+      and CPU requests and memory limits.
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/title: Require Limits and Requests
+  name: kyverno-remote-require-requests-limits
+spec:
+  background: true
+  failurePolicy: Ignore
+  rules:
+  - match:
+      resources:
+        kinds:
+        - Pod
+    name: validate-resources
+    validate:
+      message: CPU and memory resource requests and limits are required.
+      pattern:
+        spec:
+          containers:
+          - resources:
+              limits:
+                memory: ?*
+              requests:
+                cpu: ?*
+                memory: ?*
+  validationFailureAction: audit

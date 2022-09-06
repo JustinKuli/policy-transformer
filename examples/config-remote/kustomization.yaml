@@ -1,9 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- deployment.yaml
-- service.yaml
+- ../common/kyverno-remote
 commonLabels:
-  app: my-local-app
+  app: config-remote
 transformers:
-- configuration-policy-wrapper.yaml
+- ./configuration-policy-wrapper.yaml

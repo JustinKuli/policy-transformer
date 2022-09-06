@@ -1,0 +1,15 @@
+apiVersion: policy.open-cluster-management.io/v1alpha1
+kind: ConfigurationPolicyWrapper
+metadata:
+  name: one-step-config
+  annotations:
+    config.kubernetes.io/function: |
+      container:
+        image: quay.io/justinkuli/scratchpad:policy-transformer
+spec:
+  consolidateManifests: false # Make a separate ConfigurationPolicy for each input
+  complianceType: "mustonlyhave"
+  namespaceSelector:
+    include: ["default"]
+    exclude: ["openshift-*"]
+  remediationAction: "enforce"

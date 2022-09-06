@@ -1,0 +1,262 @@
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-preexisting-placement
+spec:
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions: []
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-preexisting-placement
+placementRef:
+  apiGroup: apps.open-cluster-management.io
+  kind: PlacementRule
+  name: placement-preexisting-placement
+subjects:
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: preexisting-placement-0
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: preexisting-placement-1
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  name: preexisting-placement-0
+spec:
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations: {}
+        name: config-local-simple
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              annotations: {}
+              labels:
+                app: config-local-simple
+              name: local-one-nginx-deployment
+            spec:
+              replicas: 3
+              selector:
+                matchLabels:
+                  app: config-local-simple
+              template:
+                metadata:
+                  labels:
+                    app: config-local-simple
+                spec:
+                  containers:
+                  - image: nginx:1.14.2
+                    name: nginx
+                    ports:
+                    - containerPort: 80
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              annotations: {}
+              labels:
+                app: config-local-simple
+              name: local-one-my-service
+            spec:
+              ports:
+              - port: 80
+                protocol: TCP
+                targetPort: 9376
+              selector:
+                app: config-local-simple
+        remediationAction: inform
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  name: preexisting-placement-1
+spec:
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations: {}
+        name: config-remote
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: kyverno.io/v1
+            kind: ClusterPolicy
+            metadata:
+              annotations:
+                pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet
+                policies.kyverno.io/category: Best Practices
+                policies.kyverno.io/description: Liveness and readiness probes need
+                  to be configured to correctly manage a Pod's lifecycle during deployments,
+                  restarts, and upgrades. For each Pod, a periodic `livenessProbe`
+                  is performed by the kubelet to determine if the Pod's containers
+                  are running or need to be restarted. A `readinessProbe` is used
+                  by Services and Deployments to determine if the Pod is ready to
+                  receive network traffic. This policy validates that all containers
+                  have liveness and readiness probes by ensuring the `periodSeconds`
+                  field is greater than zero.
+                policies.kyverno.io/severity: medium
+                policies.kyverno.io/subject: Pod
+                policies.kyverno.io/title: Require Pod Probes
+              labels:
+                app: config-remote
+              name: kyverno-remote-require-pod-probes
+            spec:
+              background: true
+              failurePolicy: Ignore
+              rules:
+              - match:
+                  resources:
+                    kinds:
+                    - Pod
+                name: validate-livenessProbe-readinessProbe
+                validate:
+                  message: Liveness and readiness probes are required.
+                  pattern:
+                    spec:
+                      containers:
+                      - livenessProbe:
+                          periodSeconds: '>0'
+                        readinessProbe:
+                          periodSeconds: '>0'
+              validationFailureAction: audit
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: kyverno.io/v1
+            kind: ClusterPolicy
+            metadata:
+              annotations:
+                policies.kyverno.io/category: Multi-Tenancy
+                policies.kyverno.io/description: As application workloads share cluster
+                  resources, it is important to limit resources requested and consumed
+                  by each Pod. It is recommended to require resource requests and
+                  limits per Pod, especially for memory and CPU. If a Namespace level
+                  request or limit is specified, defaults will automatically be applied
+                  to each Pod based on the LimitRange configuration. This policy validates
+                  that all containers have something specified for memory and CPU
+                  requests and memory limits.
+                policies.kyverno.io/severity: medium
+                policies.kyverno.io/subject: Pod
+                policies.kyverno.io/title: Require Limits and Requests
+              labels:
+                app: config-remote
+              name: kyverno-remote-require-requests-limits
+            spec:
+              background: true
+              failurePolicy: Ignore
+              rules:
+              - match:
+                  resources:
+                    kinds:
+                    - Pod
+                name: validate-resources
+                validate:
+                  message: CPU and memory resource requests and limits are required.
+                  pattern:
+                    spec:
+                      containers:
+                      - resources:
+                          limits:
+                            memory: ?*
+                          requests:
+                            cpu: ?*
+                            memory: ?*
+              validationFailureAction: audit
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: kyverno.io/v1
+            kind: ClusterPolicy
+            metadata:
+              annotations:
+                kyverno.io/kubernetes-version: "1.20"
+                kyverno.io/kyverno-version: 1.6.0
+                policies.kyverno.io/category: Security
+                policies.kyverno.io/description: Disallow the use of the SecurityContextConstraint
+                  (SCC) anyuid which allows a pod to run with the UID as declared
+                  in the image instead of a random UID
+                policies.kyverno.io/minversion: 1.6.0
+                policies.kyverno.io/severity: high
+                policies.kyverno.io/subject: Role,ClusterRole
+                policies.kyverno.io/title: Disallow use of the SecurityContextConstraint
+                  (SCC) anyuid
+              labels:
+                app: config-remote
+              name: kyverno-remote-disallow-security-context-constraint-anyuid
+            spec:
+              background: true
+              failurePolicy: Ignore
+              rules:
+              - match:
+                  any:
+                  - resources:
+                      kinds:
+                      - ClusterRole
+                      - Role
+                name: check-security-context-constraint
+                validate:
+                  foreach:
+                  - deny:
+                      conditions:
+                        all:
+                        - key: anyuid
+                          operator: AnyIn
+                          value: '{{element.resourceNames[]}}'
+                        - key: '{{ element.verbs[]  | contains(@, ''use'') || contains(@,
+                            ''*'') }}'
+                          operator: Equals
+                          value: true
+                    list: request.object.rules[]
+                  message: Use of the SecurityContextConstraint (SCC) anyuid is not
+                    allowed
+              - match:
+                  any:
+                  - resources:
+                      kinds:
+                      - ClusterRoleBinding
+                      - RoleBinding
+                name: check-security-context-roleref
+                validate:
+                  deny:
+                    conditions:
+                      all:
+                      - key: system:openshift:scc:anyuid
+                        operator: Equals
+                        value: '{{request.object.roleRef.name}}'
+                  message: Use of the SecurityContextConstraint (SCC) anyuid is not
+                    allowed
+              validationFailureAction: audit
+        remediationAction: enforce

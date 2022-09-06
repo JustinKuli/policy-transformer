@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../common/local-one
+commonLabels:
+  app: config-local-simple
+transformers:
+- ./configuration-policy-wrapper.yaml

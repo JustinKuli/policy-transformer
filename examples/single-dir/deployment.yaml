@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: single-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {} # set by kustomize
+  template:
+    metadata:
+      labels: {} # set by kustomize
+    spec:
+      containers:
+      - name: single
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80

@@ -1,0 +1,110 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: placement-one-step-pol
+spec:
+  clusterSelector:
+    matchExpressions:
+    - key: local-cluster
+      operator: In
+      values:
+      - true
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-one-step-pol
+placementRef:
+  apiGroup: apps.open-cluster-management.io
+  kind: PlacementRule
+  name: placement-one-step-pol
+subjects:
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: one-step-pol-0
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: one-step-pol-1
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: ""
+    policy.open-cluster-management.io/controls: ""
+    policy.open-cluster-management.io/standards: ""
+  name: one-step-pol-0
+spec:
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations: {}
+        name: one-step-config-0
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              annotations: {}
+              name: local-one-nginx-deployment
+            spec:
+              replicas: 3
+              selector:
+                matchLabels: {}
+              template:
+                metadata:
+                  labels: {}
+                spec:
+                  containers:
+                  - image: nginx:1.14.2
+                    name: nginx
+                    ports:
+                    - containerPort: 80
+        remediationAction: enforce
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: ""
+    policy.open-cluster-management.io/controls: ""
+    policy.open-cluster-management.io/standards: ""
+  name: one-step-pol-1
+spec:
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations: {}
+        name: one-step-config-1
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              annotations: {}
+              name: local-one-my-service
+            spec:
+              ports:
+              - port: 80
+                protocol: TCP
+                targetPort: 9376
+              selector: {}
+        remediationAction: enforce

@@ -1,0 +1,94 @@
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-polwrap
+spec:
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions: []
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-polwrap
+placementRef:
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+  name: placement-polwrap
+subjects:
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: polwrap
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: ""
+    policy.open-cluster-management.io/controls: ""
+    policy.open-cluster-management.io/standards: ""
+  name: polwrap
+spec:
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations: {}
+        name: cfgwrap-0
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              annotations: {}
+              name: single-deployment
+            spec:
+              replicas: 3
+              selector:
+                matchLabels: {}
+              template:
+                metadata:
+                  labels: {}
+                spec:
+                  containers:
+                  - image: nginx:1.14.2
+                    name: single
+                    ports:
+                    - containerPort: 80
+        remediationAction: inform
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        annotations: {}
+        name: cfgwrap-1
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift-*
+          include:
+          - default
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              annotations: {}
+              name: single-service
+            spec:
+              ports:
+              - port: 80
+                protocol: TCP
+                targetPort: 9376
+              selector: {}
+        remediationAction: inform

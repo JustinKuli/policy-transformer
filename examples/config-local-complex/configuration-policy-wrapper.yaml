@@ -1,26 +1,25 @@
 apiVersion: policy.open-cluster-management.io/v1alpha1
 kind: ConfigurationPolicyWrapper
 metadata:
-  name: kyverno
+  name: config-local-complex
   annotations:
     config.kubernetes.io/function: |
       container:
         image: quay.io/justinkuli/scratchpad:policy-transformer
 spec:
-  # This is an example of setting basically everything.
   configurationPolicyAnnotations:
     policy.open-cluster-management.io/disable-templates: "true"
-  complianceType: "mustnothave"
-  consolidateManifests: false
+  complianceType: "mustonlyhave"
+  consolidateManifests: false # multiple configuration policies will be emitted
   evaluationInterval:
     compliant: 30m
     noncompliant: 45s
-  metadataComplianceType: ""
+  metadataComplianceType: "musthave"
   namespaceSelector:
     include: ["default"]
     exclude: ["openshift-*"]
     matchLabels:
-      "kyverno": "install-here"
+      "foobar": "baz"
     matchExpressions:
     - key: "openshift-only"
       operator: "NotIn"

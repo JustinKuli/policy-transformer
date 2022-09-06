@@ -1,18 +1,14 @@
 apiVersion: policy.open-cluster-management.io/v1alpha1
 kind: ConfigurationPolicyWrapper
 metadata:
-  name: local-app
+  name: config-local-simple
   annotations:
     config.kubernetes.io/function: |
       container:
         image: quay.io/justinkuli/scratchpad:policy-transformer
 spec:
-  # This is a smaller example
-  # complianceType: "mustnothave" # musthave by default
-  # consolidateManifests: true # true by default
-  evaluationInterval:
-    compliant: 1h
+  complianceType: "musthave" # this is the default
   namespaceSelector:
     include: ["default"]
     exclude: ["openshift-*"]
-  # remediationAction: "inform" # inform by default
+  remediationAction: "inform" # this is the default
