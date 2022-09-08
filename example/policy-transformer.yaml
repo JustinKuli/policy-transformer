@@ -3,9 +3,9 @@ kind: FakePolicyTransformer
 # kind: FakeContainerPolicyTransformer
 metadata:
   name: jkulikau
-  # annotations:
-  #   config.kubernetes.io/function: |
-  #     container:
-  #       image: quay.io/justinkuli/scratchpad:policy-transformer
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ./plugin
 spec:
   foo: bar
